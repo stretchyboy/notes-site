@@ -1,6 +1,6 @@
 ---
-title: Welcome to Quartz
+title: Welcome to Martyn's Notes
 ---
 
-This is a blank Quartz installation.
-See the [documentation](https://quartz.jzhao.xyz) for how to get started.
+# The point
+To give me a better place to work than google keep
