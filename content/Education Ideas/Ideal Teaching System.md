@@ -21,3 +21,8 @@ Ideal
 			Coding Exercises
 					
 ```
+
+
+## Possible Technologies
+
+https://github.com/davidvkimball/obsidian-astro-composer
