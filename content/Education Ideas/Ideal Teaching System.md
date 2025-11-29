@@ -5,6 +5,9 @@ Ideal
 	Authoring
 		Markdown
 			Mermaid
+		Reusable sections
+		Animations
+		Styling
 		Drag & Drop images
 		Coding Exercises
 			K-PRIDE or similar + testing
@@ -18,8 +21,8 @@ Ideal
 			Reading
 			Coding Exercises
 		Presentation for classroom
-			Coding Exercises
-					
+			Live Coding Exercises
+		Images / Powerpoints 
 ```
 
 
