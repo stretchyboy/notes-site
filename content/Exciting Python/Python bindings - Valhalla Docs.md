@@ -1,12 +1,12 @@
 ---
-title: "Python bindings - Valhalla Docs"
-source: "https://valhalla.github.io/valhalla/README_python/"
+title: Python bindings - Valhalla Docs
+source: https://valhalla.github.io/valhalla/README_python/
 author:
-published:
+published: 2025-05-01
 created: 2025-11-29
 description:
 tags:
-  - "clippings"
+  - clippings
 ---
 [Skip to content](https://valhalla.github.io/valhalla/README_python/#valhalla-python-bindings)
 

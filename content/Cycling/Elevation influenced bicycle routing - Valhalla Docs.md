@@ -1,12 +1,12 @@
 ---
-title: "Elevation influenced bicycle routing - Valhalla Docs"
-source: "https://valhalla.github.io/valhalla/sif/elevation_costing/"
+title: Elevation influenced bicycle routing - Valhalla Docs
+source: https://valhalla.github.io/valhalla/sif/elevation_costing/
 author:
-published:
+published: 2025-05-01
 created: 2025-11-29
 description:
 tags:
-  - "clippings"
+  - clippings
 ---
 [Skip to content](https://valhalla.github.io/valhalla/sif/elevation_costing/#elevation-influenced-bicycle-routing)
 
