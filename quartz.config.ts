@@ -16,9 +16,8 @@ const config: QuartzConfig = {
       provider: "plausible",
     },
     locale: "en-US",
-    // Use a relative baseUrl for GitHub Pages so assets are served correctly.
-    // If you host on a custom domain, set it to the full URL (e.g. "https://example.com").
-    baseUrl: "/notes-site/",
+    // For project pages, include username.github.io/repo with no protocol or leading/trailing slash.
+    baseUrl: "stretchyboy.github.io/notes-site",
     ignorePatterns: ["private", "templates", ".obsidian"],
     defaultDateType: "modified",
     theme: {
