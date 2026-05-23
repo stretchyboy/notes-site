@@ -9,6 +9,65 @@ Quartz v4 features a from-the-ground rewrite focusing on end-user extensibility 
 
 [Join the Discord Community](https://discord.gg/cRFFHYye7t)
 
+## Quick Start
+
+```bash
+npm install
+npx quartz build --serve
+```
+
+## Run Locally
+
+This project runs with Node.js (not Python).
+
+### Prerequisites
+
+- Node.js `>=22`
+- npm `>=10.9.2`
+
+Check versions:
+
+```bash
+node -v
+npm -v
+```
+
+### Install dependencies
+
+From the repo root:
+
+```bash
+npm install
+```
+
+### Start local dev server
+
+Serve your notes in `content/` with live rebuilds:
+
+```bash
+npx quartz build --serve
+```
+
+By default Quartz serves on `http://localhost:8080`.
+
+### Build once (no local server)
+
+```bash
+npx quartz build
+```
+
+### Optional: run docs site locally
+
+```bash
+npm run docs
+```
+
+### Troubleshooting
+
+- `python -m quartz --help` fails because Quartz is a Node CLI, not a Python module.
+- If `npx quartz` is not found, run `npm install` first.
+- If the port is busy, stop the other process or run on a different port (see Quartz docs).
+
 ## Sponsors
 
 <p align="center">
