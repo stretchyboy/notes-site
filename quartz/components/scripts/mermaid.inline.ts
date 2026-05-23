@@ -142,6 +142,207 @@ const cssVars = [
   "--codeFont",
 ] as const
 
+interface RgbColor {
+  r: number
+  g: number
+  b: number
+}
+
+interface ContrastIssue {
+  variable: string
+  foreground: string
+  background: string
+  contrastRatio: string
+  minRatio: number
+  fallback: string
+}
+
+let lastMermaidContrastWarning = ""
+
+function hexToRgb(value: string): RgbColor | null {
+  const normalized = value.trim().replace("#", "")
+
+  if (![3, 4, 6, 8].includes(normalized.length)) {
+    return null
+  }
+
+  const expanded =
+    normalized.length <= 4
+      ? normalized
+          .slice(0, 3)
+          .split("")
+          .map((channel) => channel + channel)
+          .join("")
+      : normalized.slice(0, 6)
+
+  const r = parseInt(expanded.slice(0, 2), 16)
+  const g = parseInt(expanded.slice(2, 4), 16)
+  const b = parseInt(expanded.slice(4, 6), 16)
+
+  if ([r, g, b].some((component) => Number.isNaN(component))) {
+    return null
+  }
+
+  return { r, g, b }
+}
+
+function rgbStringToRgb(value: string): RgbColor | null {
+  const match = value
+    .trim()
+    .match(/^rgba?\(\s*([0-9]+(?:\.[0-9]+)?)\s*,\s*([0-9]+(?:\.[0-9]+)?)\s*,\s*([0-9]+(?:\.[0-9]+)?)/i)
+
+  if (!match) {
+    return null
+  }
+
+  const r = Number(match[1])
+  const g = Number(match[2])
+  const b = Number(match[3])
+
+  if ([r, g, b].some((component) => Number.isNaN(component) || component < 0 || component > 255)) {
+    return null
+  }
+
+  return { r, g, b }
+}
+
+function parseColor(value: string): RgbColor | null {
+  if (!value) return null
+  return value.trim().startsWith("#") ? hexToRgb(value) : rgbStringToRgb(value)
+}
+
+function relativeLuminance(color: RgbColor): number {
+  const toLinear = (channel: number): number => {
+    const normalized = channel / 255
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : Math.pow((normalized + 0.055) / 1.055, 2.4)
+  }
+
+  const r = toLinear(color.r)
+  const g = toLinear(color.g)
+  const b = toLinear(color.b)
+
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function getContrastRatio(foreground: string, background: string): number | null {
+  const fg = parseColor(foreground)
+  const bg = parseColor(background)
+  if (!fg || !bg) return null
+
+  const lighter = Math.max(relativeLuminance(fg), relativeLuminance(bg))
+  const darker = Math.min(relativeLuminance(fg), relativeLuminance(bg))
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function ensureContrast(params: {
+  variable: string
+  foreground: string
+  background: string
+  minRatio: number
+  fallback: string
+  issues: ContrastIssue[]
+}): string {
+  const { variable, foreground, background, minRatio, fallback, issues } = params
+  const contrastRatio = getContrastRatio(foreground, background)
+
+  if (contrastRatio !== null && contrastRatio < minRatio) {
+    issues.push({
+      variable,
+      foreground,
+      background,
+      contrastRatio: contrastRatio.toFixed(2),
+      minRatio,
+      fallback,
+    })
+    return fallback
+  }
+
+  return foreground
+}
+
+function pickContrastingColor(params: {
+  variable: string
+  currentColor: string
+  textColor: string
+  minRatio: number
+  candidates: string[]
+  issues: ContrastIssue[]
+}): string {
+  const { variable, currentColor, textColor, minRatio, candidates, issues } = params
+  const validCandidates = candidates.map((value) => value.trim()).filter((value) => value.length > 0)
+  const currentContrast = getContrastRatio(textColor, currentColor)
+
+  if (currentContrast !== null && currentContrast >= minRatio) {
+    return currentColor
+  }
+
+  for (const candidate of validCandidates) {
+    const candidateContrast = getContrastRatio(textColor, candidate)
+    if (candidateContrast !== null && candidateContrast >= minRatio) {
+      issues.push({
+        variable,
+        foreground: textColor,
+        background: currentColor,
+        contrastRatio: currentContrast?.toFixed(2) ?? "unknown",
+        minRatio,
+        fallback: candidate,
+      })
+      return candidate
+    }
+  }
+
+  const fallback = validCandidates.at(-1) ?? currentColor
+  issues.push({
+    variable,
+    foreground: textColor,
+    background: currentColor,
+    contrastRatio: currentContrast?.toFixed(2) ?? "unknown",
+    minRatio,
+    fallback,
+  })
+  return fallback
+}
+
+function pickReadableTextColor(params: {
+  variable: string
+  currentText: string
+  background: string
+  minRatio: number
+  candidates: string[]
+  issues: ContrastIssue[]
+}): string {
+  const { variable, currentText, background, minRatio, candidates, issues } = params
+  const validCandidates = candidates.map((value) => value.trim()).filter((value) => value.length > 0)
+  const currentContrast = getContrastRatio(currentText, background)
+
+  if (currentContrast !== null && currentContrast >= minRatio) {
+    return currentText
+  }
+
+  let bestCandidate = currentText
+  let bestContrast = currentContrast ?? -1
+  for (const candidate of validCandidates) {
+    const contrastRatio = getContrastRatio(candidate, background)
+    if (contrastRatio !== null && contrastRatio > bestContrast) {
+      bestContrast = contrastRatio
+      bestCandidate = candidate
+    }
+  }
+
+  issues.push({
+    variable,
+    foreground: currentText,
+    background,
+    contrastRatio: currentContrast?.toFixed(2) ?? "unknown",
+    minRatio,
+    fallback: bestCandidate,
+  })
+
+  return bestCandidate
+}
+
 let mermaidImport = undefined
 document.addEventListener("nav", async () => {
   const center = document.querySelector(".center") as HTMLElement
@@ -171,27 +372,132 @@ document.addEventListener("nav", async () => {
 
     const computedStyleMap = cssVars.reduce(
       (acc, key) => {
-        acc[key] = window.getComputedStyle(document.documentElement).getPropertyValue(key)
+        acc[key] = window.getComputedStyle(document.documentElement).getPropertyValue(key).trim()
         return acc
       },
       {} as Record<(typeof cssVars)[number], string>,
     )
 
     const darkMode = document.documentElement.getAttribute("saved-theme") === "dark"
+    const contrastIssues: ContrastIssue[] = []
+    const lightFallbackText = "#1f1f1f"
+    const darkFallbackText = "#f0f0f0"
+    const lightFallbackStroke = "#444444"
+    const darkFallbackStroke = "#d0d0d0"
+    const textCandidates = [
+      computedStyleMap["--dark"],
+      computedStyleMap["--darkgray"],
+      computedStyleMap["--light"],
+      computedStyleMap["--lightgray"],
+      lightFallbackText,
+      darkFallbackText,
+    ]
+    const primaryColor = computedStyleMap["--light"]
+    const primaryTextColor = ensureContrast({
+      variable: "primaryTextColor",
+      foreground: computedStyleMap["--darkgray"],
+      background: primaryColor,
+      minRatio: 4.5,
+      fallback: darkMode ? darkFallbackText : lightFallbackText,
+      issues: contrastIssues,
+    })
+    const primaryBorderColor = ensureContrast({
+      variable: "primaryBorderColor",
+      foreground: computedStyleMap["--tertiary"],
+      background: primaryColor,
+      minRatio: 3,
+      fallback: darkMode ? darkFallbackStroke : lightFallbackStroke,
+      issues: contrastIssues,
+    })
+    const secondaryColor = pickContrastingColor({
+      variable: "secondaryColor",
+      currentColor: computedStyleMap["--secondary"],
+      textColor: primaryTextColor,
+      minRatio: 4.5,
+      candidates: darkMode
+        ? [computedStyleMap["--gray"], computedStyleMap["--darkgray"], "#3a3a3a"]
+        : [computedStyleMap["--lightgray"], computedStyleMap["--gray"], "#e0e0e0"],
+      issues: contrastIssues,
+    })
+    const tertiaryColor = pickContrastingColor({
+      variable: "tertiaryColor",
+      currentColor: computedStyleMap["--tertiary"],
+      textColor: primaryTextColor,
+      minRatio: 4.5,
+      candidates: darkMode
+        ? [computedStyleMap["--gray"], computedStyleMap["--darkgray"], "#3a3a3a"]
+        : [computedStyleMap["--lightgray"], computedStyleMap["--gray"], "#e0e0e0"],
+      issues: contrastIssues,
+    })
+    const secondaryTextColor = pickReadableTextColor({
+      variable: "secondaryTextColor",
+      currentText: primaryTextColor,
+      background: secondaryColor,
+      minRatio: 4.5,
+      candidates: textCandidates,
+      issues: contrastIssues,
+    })
+    const tertiaryTextColor = pickReadableTextColor({
+      variable: "tertiaryTextColor",
+      currentText: primaryTextColor,
+      background: tertiaryColor,
+      minRatio: 4.5,
+      candidates: textCandidates,
+      issues: contrastIssues,
+    })
+    const lineColor = ensureContrast({
+      variable: "lineColor",
+      foreground: computedStyleMap["--darkgray"],
+      background: primaryColor,
+      minRatio: 3,
+      fallback: darkMode ? darkFallbackStroke : lightFallbackStroke,
+      issues: contrastIssues,
+    })
+    const edgeLabelBackground = pickContrastingColor({
+      variable: "edgeLabelBackground",
+      currentColor: computedStyleMap["--highlight"],
+      textColor: primaryTextColor,
+      minRatio: 4.5,
+      candidates: [primaryColor, secondaryColor, tertiaryColor, computedStyleMap["--lightgray"]],
+      issues: contrastIssues,
+    })
+
+    if (contrastIssues.length > 0) {
+      const issueKey = JSON.stringify({ darkMode, contrastIssues })
+      if (issueKey !== lastMermaidContrastWarning) {
+        lastMermaidContrastWarning = issueKey
+        console.warn("[Quartz Mermaid] Applied contrast-safe fallback colors.", {
+          mode: darkMode ? "dark" : "light",
+          issues: contrastIssues,
+          recommendation:
+            "Adjust theme colors in quartz.config.ts to improve Mermaid readability and remove fallback substitutions.",
+        })
+      }
+    }
+
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "loose",
       theme: darkMode ? "dark" : "base",
       themeVariables: {
         fontFamily: computedStyleMap["--codeFont"],
-        primaryColor: computedStyleMap["--light"],
-        primaryTextColor: computedStyleMap["--darkgray"],
-        primaryBorderColor: computedStyleMap["--tertiary"],
-        lineColor: computedStyleMap["--darkgray"],
-        secondaryColor: computedStyleMap["--secondary"],
-        tertiaryColor: computedStyleMap["--tertiary"],
-        clusterBkg: computedStyleMap["--light"],
-        edgeLabelBackground: computedStyleMap["--highlight"],
+        textColor: primaryTextColor,
+        titleColor: primaryTextColor,
+        primaryColor,
+        primaryTextColor,
+        primaryBorderColor,
+        secondaryTextColor,
+        tertiaryTextColor,
+        lineColor,
+        secondaryColor,
+        tertiaryColor,
+        mainBkg: primaryColor,
+        secondBkg: secondaryColor,
+        tertiaryBkg: tertiaryColor,
+        nodeBorder: primaryBorderColor,
+        clusterBorder: primaryBorderColor,
+        clusterBkg: primaryColor,
+        edgeLabelBackground,
       },
     })
 
